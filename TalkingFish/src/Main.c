@@ -1,13 +1,15 @@
 #include <SDL2/SDL.h> 
 #include <Windows.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "../resource.h"
 
 static volatile HMENU win32MenuMicrophone;
 
 static volatile int currentMicAmplitude = 0;
-static const int AMPLITUDE_THRESHOLD_LOW  =  500;
-static const int AMPLITUDE_THRESHOLD_HIGH = 1000;
+static int AMPLITUDE_THRESHOLD_LOW  =  500;
+static int AMPLITUDE_THRESHOLD_HIGH = 1000;
 
 enum FishState
 {
@@ -36,14 +38,17 @@ int currentRecordingDeviceId = -1;
 #define MICROPHONE_10 10
 void switchToNewRecordingDevice(int newDeviceId);
 
+void loadSettings();
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     hPrevInstance;
     lpCmdLine;
     nCmdShow;
 
-    SDL_Init(SDL_INIT_AUDIO);
+    loadSettings();
 
+    SDL_Init(SDL_INIT_AUDIO);
     NUM_RECORDING_DEVICES = SDL_GetNumAudioDevices(1);
 
     WNDCLASSW wc = {0};
@@ -355,4 +360,105 @@ void switchToNewRecordingDevice(int newDeviceId)
         sdlRecordingDevice = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(currentRecordingDeviceId, 1), 1, &want, &have, 0);
         SDL_PauseAudioDevice(sdlRecordingDevice, 0);
     }
+}
+
+void loadSettings()
+{
+    FILE* file = NULL;
+    errno_t err = fopen_s(&file, "Settings.txt", "rb");
+    if (err)
+    {
+        printf("Problem when trying to load settings file = %d\n", err);
+        return;
+    }
+
+    char buf[1024];
+
+    char c = ' ';
+    while (c != ':')
+    {
+        size_t numRead = fread(&c, 1, 1, file);
+        if (numRead != 1)
+        {
+            printf("End of file reached\n");
+            fclose(file);
+            return;
+        }
+    }
+
+    for (int i = 0; i < 1024; i++)
+    {
+        size_t numRead = fread(&c, 1, 1, file);
+        if (numRead != 1)
+        {
+            printf("End of file reached\n");
+            fclose(file);
+            return;
+        }
+
+        if (c == '%')
+        {
+            buf[i] = 0;
+            double val = atof(buf);
+            if (val < 0)
+            {
+                val = 0.0;
+            }
+            else if (val > 100)
+            {
+                val = 100;
+            }
+            AMPLITUDE_THRESHOLD_LOW = (int)((val*0.01)*32766);
+            break;
+        }
+        else
+        {
+            buf[i] = c;
+        }
+    }
+
+    c = ' ';
+    while (c != ':')
+    {
+        size_t numRead = fread(&c, 1, 1, file);
+        if (numRead != 1)
+        {
+            printf("End of file reached\n");
+            fclose(file);
+            return;
+        }
+    }
+
+    for (int i = 0; i < 1024; i++)
+    {
+        size_t numRead = fread(&c, 1, 1, file);
+        if (numRead != 1)
+        {
+            printf("End of file reached\n");
+            fclose(file);
+            return;
+        }
+
+        if (c == '%')
+        {
+            buf[i] = 0;
+            double val = atof(buf);
+            if (val < 0)
+            {
+                val = 0.0;
+            }
+            else if (val > 100)
+            {
+                val = 100;
+            }
+            AMPLITUDE_THRESHOLD_HIGH = (int)((val*0.01)*32766);
+            break;
+        }
+        else
+        {
+            buf[i] = c;
+        }
+    }
+
+    fclose(file);
 }
